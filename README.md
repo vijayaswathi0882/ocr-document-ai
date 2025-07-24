@@ -162,6 +162,8 @@ ls -la logs/
 | GET | `/documents` | List all documents |
 | GET | `/documents/{id}/search` | Search in document |
 | GET | `/analytics/summary` | Processing stats |
+| POST | `/api/v1/analyze` | Analyze document (returns JSON only) |
+| POST | `/api/v1/analyze-text` | Analyze raw text (returns JSON only) |
 
 ## 🗄️ MySQL Database Schema
 

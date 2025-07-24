@@ -3,6 +3,7 @@ import asyncio
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+from app.services.document_analyzer import DocumentAnalyzer
 
 try:
     from azure.ai.textanalytics import TextAnalyticsClient
@@ -21,6 +22,7 @@ class NLPService:
     def __init__(self):
         self.settings = get_settings()
         self.client = None
+        self.document_analyzer = DocumentAnalyzer()
 
         if AZURE_AVAILABLE and self.settings.azure_text_analytics_endpoint:
             try:
@@ -102,48 +104,11 @@ class NLPService:
         return {"entities": entities}
 
     async def extract_structured_data(self, text: str) -> Dict[str, Any]:
-        """Extract structured data specifically for real estate documents"""
+        """Extract structured data using intelligent document analyzer"""
         try:
-            entities_result = await self.extract_entities(text)
-            entities = entities_result.get("entities", [])
-
-            structured_data = {
-                "landlord_name": None,
-                "tenant_name": None,
-                "monthly_rent": None,
-                "document_type": self._classify_document_type(text),
-                "lease_start_date": None,
-                "lease_end_date": None,
-                "property_address": None,
-                "pin_code": None,
-                "phone_numbers": [],
-                "property_details": self._extract_property_details(text),
-                "security_deposit": None
-            }
-
-            for entity in entities:
-                category = entity["category"]
-                value = entity["text"]
-
-                if category == "OWNER":
-                    structured_data["landlord_name"] = value
-                elif category == "TENANT":
-                    structured_data["tenant_name"] = value
-                elif category == "ADDRESS":
-                    structured_data["property_address"] = value
-                elif category == "PIN":
-                    structured_data["pin_code"] = value
-                elif category == "MONEY":
-                    if not structured_data["monthly_rent"]:
-                        structured_data["monthly_rent"] = value
-                elif category == "DATE":
-                    if not structured_data["lease_start_date"]:
-                        structured_data["lease_start_date"] = value
-                    else:
-                        structured_data["lease_end_date"] = value
-                elif category == "DOC_TYPE":
-                    structured_data["document_type"] = value
-
+            # Use the intelligent document analyzer
+            structured_data = self.document_analyzer.analyze_document(text)
+            logger.info(f"Document analyzed with confidence: {structured_data.get('confidence_score', 0)}")
             return structured_data
 
         except Exception as e:

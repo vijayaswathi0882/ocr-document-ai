@@ -53,7 +53,6 @@ class DocumentProcessor:
             
             # Compile final result
             result = {
-                "raw_text": raw_text,
                 "extracted_data": structured_data,
                 "confidence_score": confidence_score,
                 "ocr_metadata": {
@@ -71,7 +70,6 @@ class DocumentProcessor:
         except Exception as e:
             logger.error(f"Document processing failed: {e}")
             return {
-                "raw_text": "",
                 "extracted_data": {},
                 "confidence_score": 0.0,
                 "error": str(e),
@@ -84,23 +82,24 @@ class DocumentProcessor:
         try:
             ocr_confidence = ocr_result.get("confidence", 0.0)
             
-            # Count extracted fields
+            # Get confidence from structured data analysis
+            analysis_confidence = structured_data.get("confidence_score", 0.0)
+            
+            # Count non-null extracted fields for additional validation
             field_count = 0
-            total_fields = 8  # Expected fields in real estate documents
+            total_fields = 20  # Total extractable fields
             
             if isinstance(structured_data, dict) and "error" not in structured_data:
                 for key, value in structured_data.items():
-                    if value is not None and value != "" and key != "property_details":
+                    if key == "confidence_score":
+                        continue
+                    if value is not None and value != "" and value != []:
                         field_count += 1
-                
-                # Add property details count
-                property_details = structured_data.get("property_details", {})
-                field_count += len([v for v in property_details.values() if v is not None])
             
             extraction_confidence = field_count / total_fields
             
-            # Weighted average
-            overall_confidence = (ocr_confidence * 0.6) + (extraction_confidence * 0.4)
+            # Weighted average: OCR confidence, analysis confidence, and field extraction
+            overall_confidence = (ocr_confidence * 0.3) + (analysis_confidence * 0.5) + (extraction_confidence * 0.2)
             
             return round(overall_confidence, 2)
             

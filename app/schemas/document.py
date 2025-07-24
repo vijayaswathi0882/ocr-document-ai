@@ -15,7 +15,6 @@ class DocumentResponse(BaseModel):
     status: str
     upload_timestamp: datetime
     processed_timestamp: Optional[datetime] = None
-    raw_text: Optional[str] = None
     extracted_data: Optional[Dict[str, Any]] = None
     confidence_score: Optional[float] = None
     error_message: Optional[str] = None

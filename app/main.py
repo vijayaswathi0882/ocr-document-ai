@@ -14,12 +14,14 @@ from app.services.storage_service import StorageService
 from app.services.document_processor import DocumentProcessor
 from app.models.document import Document
 from app.schemas.document import DocumentResponse, DocumentCreate, ProcessingStatus
+from app.api.document_analysis import router as analysis_router
 
 from fastapi import FastAPI
 from app.routes.document_routes import router as document_router
 
 app = FastAPI()
 app.include_router(document_router)
+app.include_router(analysis_router, prefix="/api/v1", tags=["Document Analysis"])
 
 
 
@@ -138,7 +140,7 @@ async def process_document_background(document_id: int, file_path: str):
             result = await document_processor.process_document(file_path)
             
             # Update document with results
-            document.raw_text = result.get("raw_text", "")
+            # Store only structured data, not raw text
             document.extracted_data = result.get("extracted_data", {})
             document.confidence_score = result.get("confidence_score", 0.0)
             document.status = "completed"
@@ -176,7 +178,6 @@ async def get_document(document_id: int, db_session=Depends(get_db)):
         status=document.status,
         upload_timestamp=document.upload_timestamp,
         processed_timestamp=document.processed_timestamp,
-        raw_text=document.raw_text,
         extracted_data=document.extracted_data,
         confidence_score=document.confidence_score,
         error_message=document.error_message
@@ -216,25 +217,24 @@ async def search_document(
     query: str,
     db_session=Depends(get_db)
 ):
-    """Search within a specific document"""
+    """Search within a specific document's extracted data"""
     document = db_session.query(Document).filter(Document.id == document_id).first()
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
     
-    # Simple text search in raw text and extracted data
-    raw_text = document.raw_text or ""
+    # Search in extracted structured data only
     extracted_data = document.extracted_data or {}
     
     matches = []
-    
-    # Search in raw text
-    if query.lower() in raw_text.lower():
-        matches.append({"type": "raw_text", "content": "Found in document text"})
     
     # Search in extracted data
     for key, value in extracted_data.items():
         if isinstance(value, str) and query.lower() in value.lower():
             matches.append({"type": "extracted_field", "field": key, "value": value})
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, str) and query.lower() in item.lower():
+                    matches.append({"type": "extracted_field", "field": key, "value": item})
     
     return {"query": query, "matches": matches}
 

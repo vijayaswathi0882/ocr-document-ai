@@ -13,12 +13,17 @@ class DocumentAnalyzer:
         self.document_patterns = {
             'invoice': [
                 r'invoice',
+                r'tax\s+invoice',
+                r'invoice#',
                 r'bill\s+to',
                 r'invoice\s+number',
                 r'invoice\s+date',
                 r'due\s+date',
                 r'total\s+amount',
-                r'amount\s+due'
+                r'amount\s+due',
+                r'gstin',
+                r'pan\s+no',
+                r'payment\s+made'
             ],
             'rental_agreement': [
                 r'lease\s+agreement',
@@ -110,6 +115,10 @@ class DocumentAnalyzer:
     def _identify_document_type(self, text: str) -> Optional[str]:
         """Identify the type of document"""
         text_lower = text.lower()
+        
+        # Check for invoice indicators first
+        if re.search(r'tax\s+invoice|invoice#|invoice\s+number', text_lower):
+            return "invoice"
         
         # Score each document type
         scores = {}
@@ -249,10 +258,13 @@ class DocumentAnalyzer:
     def _extract_pin_code(self, text: str) -> Optional[str]:
         """Extract PIN/ZIP code from text"""
         patterns = [
+            r'Pin\s+Code:\s*(\d{5,6})',
             r'pin\s+code[:\s]*(\d{5,6})',
             r'zip\s+code[:\s]*(\d{5})',
             r'postal\s+code[:\s]*(\d{5,6})',
-            r'\b(\d{5})\b'  # Generic 5-digit number
+            r'Pin\s+Code\s*:\s*(\d{5,6})',
+            r'\b(\d{6})\b(?=\s*Tamil\s+Nadu|\s*India|\s*Telangana)',  # 6-digit PIN codes near location names
+            r'\b(\d{5})\b(?=\s*Tamil\s+Nadu|\s*India|\s*Telangana)'   # 5-digit codes near location names
         ]
         
         for pattern in patterns:
@@ -286,9 +298,11 @@ class DocumentAnalyzer:
     def _extract_invoice_number(self, text: str) -> Optional[str]:
         """Extract invoice number from text"""
         patterns = [
+            r'INVOICE#\s*:\s*([A-Za-z0-9-]+)',
             r'invoice\s+(?:number|#)[:\s]*([A-Za-z0-9-]+)',
             r'invoice[:\s]*([A-Za-z0-9-]+)',
-            r'bill\s+(?:number|#)[:\s]*([A-Za-z0-9-]+)'
+            r'bill\s+(?:number|#)[:\s]*([A-Za-z0-9-]+)',
+            r'TAX\s+INVOICE[^#]*#\s*:\s*([A-Za-z0-9-]+)'
         ]
         
         for pattern in patterns:
@@ -301,9 +315,11 @@ class DocumentAnalyzer:
     def _extract_invoice_date(self, text: str) -> Optional[str]:
         """Extract invoice date from text"""
         patterns = [
+            r'DATE\s*:\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4})',
             r'invoice\s+date[:\s]*([A-Za-z]+ \d{1,2},? \d{4})',
             r'date[:\s]*([A-Za-z]+ \d{1,2},? \d{4})',
-            r'bill\s+date[:\s]*([A-Za-z]+ \d{1,2},? \d{4})'
+            r'bill\s+date[:\s]*([A-Za-z]+ \d{1,2},? \d{4})',
+            r'DATE\s*:\s*(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})'
         ]
         
         for pattern in patterns:
@@ -316,9 +332,11 @@ class DocumentAnalyzer:
     def _extract_due_date(self, text: str) -> Optional[str]:
         """Extract due date from text"""
         patterns = [
+            r'DUE\s+DATE\s*:\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4})',
             r'due\s+date[:\s]*([A-Za-z]+ \d{1,2},? \d{4})',
             r'payment\s+due[:\s]*([A-Za-z]+ \d{1,2},? \d{4})',
-            r'due\s+by[:\s]*([A-Za-z]+ \d{1,2},? \d{4})'
+            r'due\s+by[:\s]*([A-Za-z]+ \d{1,2},? \d{4})',
+            r'DUE\s+DATE\s*:\s*(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})'
         ]
         
         for pattern in patterns:
@@ -331,9 +349,11 @@ class DocumentAnalyzer:
     def _extract_bill_to_name(self, text: str) -> Optional[str]:
         """Extract bill to name from text"""
         patterns = [
+            r'Bill\s+To\s*\n\s*([A-Za-z\s]+?)(?:\n|Attn:)',
             r'bill\s+to[:\s]*([A-Za-z\s]+?)(?:\n|$|,)',
             r'billed\s+to[:\s]*([A-Za-z\s]+?)(?:\n|$|,)',
-            r'customer[:\s]*([A-Za-z\s]+?)(?:\n|$|,)'
+            r'customer[:\s]*([A-Za-z\s]+?)(?:\n|$|,)',
+            r'Bill\s+To[^A-Za-z]*([A-Za-z\s]+?)(?:Attn:|H\s+No\.|Address:|$)'
         ]
         
         for pattern in patterns:
@@ -348,9 +368,11 @@ class DocumentAnalyzer:
     def _extract_bill_to_address(self, text: str) -> Optional[str]:
         """Extract bill to address from text"""
         patterns = [
+            r'Bill\s+To[^H]*H\s+No\.([^G]*?)(?:GSTIN|Telangana)',
             r'bill\s+to[:\s]*[A-Za-z\s]+\n([^\n]+(?:\d{5}|\d{6}))',
             r'billing\s+address[:\s]*([^\n]+)',
-            r'customer\s+address[:\s]*([^\n]+)'
+            r'customer\s+address[:\s]*([^\n]+)',
+            r'Attn:[^\n]*\n([^G]*?)(?:GSTIN|$)'
         ]
         
         for pattern in patterns:
@@ -365,33 +387,53 @@ class DocumentAnalyzer:
     def _extract_total_amount(self, text: str) -> Optional[str]:
         """Extract total amount from text"""
         patterns = [
+            r'Total\s+₹([\d,]+\.?\d*)',
+            r'Total\s+Rs\.?\s*([\d,]+\.?\d*)',
             r'total\s+amount[:\s]*\$?([\d,]+\.?\d*)',
+            r'total\s+amount[:\s]*₹([\d,]+\.?\d*)',
             r'total[:\s]*\$?([\d,]+\.?\d*)',
+            r'total[:\s]*₹([\d,]+\.?\d*)',
             r'amount\s+due[:\s]*\$?([\d,]+\.?\d*)',
-            r'balance\s+due[:\s]*\$?([\d,]+\.?\d*)'
+            r'amount\s+due[:\s]*₹([\d,]+\.?\d*)',
+            r'balance\s+due[:\s]*\$?([\d,]+\.?\d*)',
+            r'balance\s+due[:\s]*₹([\d,]+\.?\d*)'
         ]
         
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 amount = match.group(1).replace(',', '')
-                return f"${amount}"
+                # Determine currency symbol from the original text
+                if '₹' in text:
+                    return f"₹{amount}"
+                else:
+                    return f"${amount}"
         
         return null
     
     def _extract_tax_amount(self, text: str) -> Optional[str]:
         """Extract tax amount from text"""
         patterns = [
+            r'IGST18\s*\(18%\)\s*([\d,]+\.?\d*)',
+            r'IGST\s*\d+\s*\([^)]+\)\s*([\d,]+\.?\d*)',
             r'tax[:\s]*\$?([\d,]+\.?\d*)',
+            r'tax[:\s]*₹([\d,]+\.?\d*)',
             r'sales\s+tax[:\s]*\$?([\d,]+\.?\d*)',
-            r'vat[:\s]*\$?([\d,]+\.?\d*)'
+            r'sales\s+tax[:\s]*₹([\d,]+\.?\d*)',
+            r'vat[:\s]*\$?([\d,]+\.?\d*)',
+            r'vat[:\s]*₹([\d,]+\.?\d*)',
+            r'GST[:\s]*₹([\d,]+\.?\d*)'
         ]
         
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 amount = match.group(1).replace(',', '')
-                return f"${amount}"
+                # Determine currency symbol from the original text
+                if '₹' in text:
+                    return f"₹{amount}"
+                else:
+                    return f"${amount}"
         
         return null
     
@@ -399,7 +441,9 @@ class DocumentAnalyzer:
         """Extract payment status from text"""
         text_lower = text.lower()
         
-        if re.search(r'\bpaid\b|\bpayment\s+received\b|\bcomplete\b', text_lower):
+        if re.search(r'\bpaid\b|\bpayment\s+received\b|\bcomplete\b|\bpayment\s+made\b', text_lower):
+            return "paid"
+        elif re.search(r'balance\s+due\s*₹?0\.00|balance\s+due\s*\$?0\.00', text_lower):
             return "paid"
         elif re.search(r'\bdue\b|\bpending\b|\bunpaid\b|\boverdue\b', text_lower):
             return "due"

@@ -89,3 +89,75 @@ async def analyze_text_endpoint(text_data: dict):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Text analysis failed: {str(e)}")
+@router.get("/test-zoho-invoice")
+async def test_zoho_invoice_endpoint():
+    """
+    Test endpoint with the actual ZOHO invoice text for debugging
+    """
+    zoho_text = """*This is a computer generated invoice and does not require a physical copy
+ 1
+ Sub Total 3,599.00
+ IGST18 (18%) 647.82
+ Total ₹4,246.82
+ Payment Made (-) 4,246.82
+ Balance Due ₹0.00
+ ZOHO Corporation Private Limited
+ Authorized Signatory
+ Total In Words
+ Rupees Four Thousand Two Hundred Forty-Six and Eighty-Two Paise 
+Only
+ Notes
+ This payment was charged from the credit card ending with 8992
+ ZOHO Corporation Private Limited
+ 942, Krisp IT Park, Vandalur Kelambakkam Road,
+ Kizhakottaiyur Village, Vandalur Taluk,
+ Chennai, Chengalpattu,
+ Pin Code: 600127
+ Tamil Nadu, India
+ Phone: +91 4469656278
+ Pan No: AAACZ4322M
+ CIN:  U40100TN2010PTC075961
+ Tan No: CHEZ03229C
+ GSTIN: 33AAACZ4322M2Z9
+ TAX INVOICE
+  INVOICE# : 1025260110273
+  DATE : 12 Jun 2025
+  TERMS : Due on Receipt
+  DUE DATE : 12 Jun 2025
+ P.O.# : 277000485847392
+  Name Of State : Telangana (36)
+  License Order No : RPIN277000376146746
+  License Sent to : procurex Technologies Pvt 
+LTD
+  UserMail : bharath.
+ devaram@procurextech.com
+ Place Of Supply : Hyderabad
+ Bill To Ship To
+ procurex Technologies Pvt LTD
+ Attn: bharath.devaram@procurextech.com
+ H No.4-49/2,Vattinagulapally, Sy.No. 237 Nearby Landmark: Rendez , 
+Gandipet Hyderabad 500019
+ Telangana India
+ GSTIN 36AAOCP7271P1ZG
+ procurex Technologies Pvt LTD
+ H No.4-49/2,Vattinagulapally, Sy.No. 237 Nearby Landmark: Rendez , 
+Gandipet Hyderabad 500019
+ Telangana India
+ Item & Description Qty Rate
+ IGST
+ Amount % Amt
+ 310572SM
+ Service : Zoho Books
+ Plan : Premium
+ Payment Duration : Monthly
+ Org Name : Procurex Technologies
+ Start 11 June 2025 End 10 July 2025
+ SAC: 997331
+ 1.00 3,599.00 18% 647.82"""
+    
+    try:
+        analyzer = DocumentAnalyzer()
+        result = analyzer.analyze_document(zoho_text)
+        return JSONResponse(content=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
